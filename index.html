@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WAT test site — cookies and trackers</title>
+<meta name="description" content="Test page for the Website Auditing Tool: accepting, rejecting and withdrawing consent to cookies and other trackers.">
+<style>
+  :root {
+    --bg: #f6f7f9; --card: #ffffff; --text: #1d2330; --muted: #5f6b7a; --line: #dfe3e8;
+    --accent: #1f5fbf; --ok: #1a7f4b; --warn: #b7791f; --bad: #c0392b; --chip: #eef2f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text); background: var(--bg); }
+  header { background: #16213a; color: #fff; padding: 20px 16px; }
+  header .wrap { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  header h1 { margin: 0; font-size: 20px; }
+  nav a { color: #cfd8ea; margin-left: 14px; text-decoration: none; }
+  nav a:hover { color: #fff; text-decoration: underline; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  main { padding: 24px 0 120px; }
+  .grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 860px) { .grid { grid-template-columns: 1fr 1fr; } .span2 { grid-column: 1 / -1; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; }
+  .card h2 { margin: 0 0 10px; font-size: 17px; }
+  .muted { color: var(--muted); }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; background: var(--chip); }
+  .badge.ok { background: #e3f5ea; color: var(--ok); } .badge.bad { background: #fbe4e1; color: var(--bad); } .badge.warn { background: #fdf1dc; color: var(--warn); }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: #fff; padding: 8px 14px; }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.danger { background: var(--bad); color: #fff; border-color: var(--bad); }
+  button:hover { filter: brightness(0.95); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; word-break: break-all; }
+  th { color: var(--muted); font-weight: 600; }
+  code { background: var(--chip); padding: 1px 5px; border-radius: 4px; font-size: 12.5px; }
+  .empty { color: var(--muted); font-style: italic; }
+  #log { max-height: 220px; overflow: auto; font-family: ui-monospace, Menlo, monospace; font-size: 12px; background: #0f1524; color: #d7e0f0; padding: 10px; border-radius: 8px; }
+  #log div + div { margin-top: 2px; }
+  label.cat { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--line); }
+  label.cat input { margin-top: 4px; }
+  label.cat small { display: block; color: var(--muted); }
+  /* Consent banner */
+  #banner { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 2px solid var(--accent); box-shadow: 0 -6px 24px rgba(0,0,0,.12); padding: 16px; z-index: 50; }
+  #banner .wrap { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  #banner p { margin: 0; max-width: 620px; }
+  #banner .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  #prefs { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
+  #prefs .dialog { background: #fff; border-radius: 12px; width: 100%; max-width: 560px; padding: 20px; max-height: 90vh; overflow: auto; }
+  #prefs .dialog h2 { margin-top: 0; }
+  #prefs .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+  #manage { position: fixed; left: 16px; bottom: 16px; z-index: 40; box-shadow: 0 4px 14px rgba(0,0,0,.15); }
+  .hidden { display: none !important; }
+  .modebar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 16px; }
+  footer { border-top: 1px solid var(--line); padding: 16px; color: var(--muted); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>WAT test site</h1>
+    <nav>
+      <a href="#trackers">Trackers</a>
+      <a href="#state">State</a>
+      <a href="#policy">Cookie policy</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <div class="modebar">
+    <span>Mode: <span id="modeBadge" class="badge"></span></span>
+    <a href="?mode=compliant">compliant</a> ·
+    <a href="?mode=noncompliant">non-compliant</a>
+    <span class="muted" id="modeHelp"></span>
+  </div>
+
+  <div class="grid">
+
+    <section class="card span2">
+      <h2>Current consent <span id="consentBadge" class="badge"></span></h2>
+      <p id="consentSummary" class="muted"></p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        <button class="primary" onclick="acceptAll()">Accept all</button>
+        <button onclick="rejectAll()">Reject all</button>
+        <button onclick="openPrefs()">Customise</button>
+        <button class="danger" onclick="withdraw()">Withdraw my consent</button>
+        <button onclick="resetAll()" title="Clears everything (including consent) and reloads the page">Reset page</button>
+      </div>
+    </section>
+
+    <section class="card" id="trackers">
+      <h2>Trackers by category</h2>
+      <table>
+        <thead><tr><th>Category</th><th>Set when consented</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Essential</strong><br><small class="muted">always active</small></td>
+              <td>cookie <code>session_id</code>, cookie <code>wat_consent</code>, localStorage <code>wat_consent_log</code></td></tr>
+          <tr><td><strong>Analytics</strong></td>
+              <td>cookies <code>_ga</code>, <code>_gid</code>; localStorage <code>analytics_client_id</code>; third-party script <code>googletagmanager.com/gtag/js</code></td></tr>
+          <tr><td><strong>Advertising</strong></td>
+              <td>cookies <code>_fbp</code>, <code>ads_uid</code>; sessionStorage <code>ad_session</code>; IndexedDB <code>marketing_db</code>; third-party pixel <code>facebook.com/tr</code></td></tr>
+          <tr><td><strong>Personalisation</strong></td>
+              <td>cookies <code>theme_pref</code>, <code>lang_pref</code>; localStorage <code>personalization_profile</code></td></tr>
+        </tbody>
+      </table>
+      <label class="cat" style="margin-top:10px">
+        <input type="checkbox" id="realThirdParty" checked onchange="saveOpts()">
+        <span>Load real third-party trackers (Google Analytics, Facebook pixel) when the category is accepted
+          <small>Unchecked: only first-party cookies and storage are set.</small></span>
+      </label>
+    </section>
+
+    <section class="card" id="state">
+      <h2>Live state <button style="float:right" onclick="render()">Refresh</button></h2>
+      <h3 style="font-size:14px;margin:8px 0 4px">Cookies</h3>
+      <table><tbody id="cookiesTbl"></tbody></table>
+      <h3 style="font-size:14px;margin:12px 0 4px">localStorage</h3>
+      <table><tbody id="lsTbl"></tbody></table>
+      <h3 style="font-size:14px;margin:12px 0 4px">sessionStorage</h3>
+      <table><tbody id="ssTbl"></tbody></table>
+      <h3 style="font-size:14px;margin:12px 0 4px">IndexedDB</h3>
+      <table><tbody id="idbTbl"></tbody></table>
+    </section>
+
+    <section class="card span2">
+      <h2>Log</h2>
+      <div id="log"></div>
+    </section>
+
+    <section class="card span2" id="policy">
+      <h2>Cookie policy</h2>
+      <p>This demo site sets cookies and uses browser storage for the sole purpose of testing the
+        <em>Website Auditing Tool</em>. Non-essential trackers are only set after you agree, per category.
+        You can change or withdraw your consent at any time using the "Manage cookies" button.
+        The consent cookie <code>wat_consent</code> is kept for 6 months.</p>
+      <p>In <strong>non-compliant</strong> mode, the page deliberately reproduces prohibited practices:
+        trackers are set before any choice is made, rejection is ignored and withdrawal has no effect.
+        This mode exists to check that the auditing tool detects these breaches.</p>
+    </section>
+
+    <section class="card span2" id="about">
+      <h2>About this website</h2>
+      <p>This website was generated with the help of Claude AI for test purposes.</p>
+    </section>
+
+  </div>
+</main>
+
+<footer>Test page — no data is actually processed. Third-party identifiers used here are dummy values.</footer>
+
+<!-- Consent banner -->
+<div id="banner" class="hidden">
+  <div class="wrap">
+    <p><strong>This site uses cookies and trackers.</strong> Some are necessary for the site to work; others
+      (analytics, advertising, personalisation) are only set with your agreement.
+      <a href="#policy">Learn more</a></p>
+    <div class="actions">
+      <button class="primary" onclick="acceptAll()">Accept all</button>
+      <button onclick="rejectAll()">Reject all</button>
+      <button onclick="openPrefs()">Customise</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detailed preferences -->
+<div id="prefs" role="dialog" aria-modal="true" aria-labelledby="prefsTitle">
+  <div class="dialog">
+    <h2 id="prefsTitle">Manage my preferences</h2>
+    <label class="cat"><input type="checkbox" checked disabled><span>Essential<small>Required for the site to work. Always active.</small></span></label>
+    <label class="cat"><input type="checkbox" id="c_analytics"><span>Analytics<small>Audience measurement (Google Analytics).</small></span></label>
+    <label class="cat"><input type="checkbox" id="c_marketing"><span>Advertising<small>Targeted advertising and campaign measurement (Facebook pixel).</small></span></label>
+    <label class="cat"><input type="checkbox" id="c_personalization"><span>Personalisation<small>Remembering your display preferences.</small></span></label>
+    <div class="actions">
+      <button onclick="closePrefs()">Cancel</button>
+      <button onclick="rejectAll()">Reject all</button>
+      <button class="primary" onclick="savePrefs()">Save my choices</button>
+    </div>
+  </div>
+</div>
+
+<button id="manage" class="hidden" onclick="openPrefs()">🍪 Manage cookies</button>
+
+<script>
+(function () {
+  'use strict';
+
+  // ---------- Configuration ----------
+  const CATEGORIES = ['analytics', 'marketing', 'personalization'];
+  const CONSENT_COOKIE = 'wat_consent';
+  const CONSENT_DAYS = 182;
+  const params = new URLSearchParams(location.search);
+  const MODE = params.get('mode') === 'noncompliant' ? 'noncompliant' : 'compliant';
+  const NON_COMPLIANT = MODE === 'noncompliant';
+
+  // ---------- Helpers ----------
+  function log(msg, level) {
+    const el = document.getElementById('log');
+    const d = document.createElement('div');
+    const t = new Date().toLocaleTimeString();
+    d.textContent = `[${t}] ${msg}`;
+    if (level === 'warn') d.style.color = '#f5c26b';
+    if (level === 'bad') d.style.color = '#ff8a80';
+    if (level === 'ok') d.style.color = '#8fe3b0';
+    el.prepend(d);
+  }
+  function setCookie(name, value, days, extra) {
+    let c = `${name}=${encodeURIComponent(value)}; path=/; SameSite=Lax`;
+    if (days) c += `; expires=${new Date(Date.now() + days * 864e5).toUTCString()}`;
+    if (location.protocol === 'https:') c += '; Secure';
+    if (extra) c += extra;
+    document.cookie = c;
+  }
+  function deleteCookie(name) {
+    const past = '; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    document.cookie = `${name}=${past}`;
+    // Domain variants (cookies set by third-party scripts on the parent domain)
+    const parts = location.hostname.split('.');
+    for (let i = 0; i < parts.length - 1; i++) {
+      const dom = parts.slice(i).join('.');
+      document.cookie = `${name}=${past}; domain=${dom}`;
+      document.cookie = `${name}=${past}; domain=.${dom}`;
+    }
+  }
+  function getCookies() {
+    if (!document.cookie) return [];
+    return document.cookie.split('; ').map(kv => { const i = kv.indexOf('='); return [kv.slice(0, i), decodeURIComponent(kv.slice(i + 1))]; });
+  }
+  function rand(n) { return Math.random().toString(36).slice(2, 2 + n); }
+  function opts() { try { return JSON.parse(localStorage.getItem('wat_test_opts') || '{}'); } catch (e) { return {}; } }
+  window.saveOpts = function () {
+    localStorage.setItem('wat_test_opts', JSON.stringify({ realThirdParty: document.getElementById('realThirdParty').checked }));
+    log('"Real third-party trackers" option: ' + document.getElementById('realThirdParty').checked);
+  };
+
+  // ---------- Consent ----------
+  function readConsent() {
+    const c = getCookies().find(([k]) => k === CONSENT_COOKIE);
+    if (!c) return null;
+    try { return JSON.parse(c[1]); } catch (e) { return null; }
+  }
+  function writeConsent(choices, action) {
+    const consent = { ...choices, action, ts: new Date().toISOString(), mode: MODE };
+    setCookie(CONSENT_COOKIE, JSON.stringify(consent), CONSENT_DAYS);
+    const hist = JSON.parse(localStorage.getItem('wat_consent_log') || '[]');
+    hist.push(consent);
+    localStorage.setItem('wat_consent_log', JSON.stringify(hist));
+    return consent;
+  }
+
+  // ---------- Trackers ----------
+  const trackers = {
+    analytics: {
+      set() {
+        setCookie('_ga', `GA1.1.${Math.floor(Math.random() * 1e9)}.${Math.floor(Date.now() / 1000)}`, 730);
+        setCookie('_gid', `GA1.1.${Math.floor(Math.random() * 1e9)}.${Math.floor(Date.now() / 1000)}`, 1);
+        localStorage.setItem('analytics_client_id', rand(16));
+        if (opts().realThirdParty !== false) {
+          if (!document.getElementById('gtagScript')) {
+            const s = document.createElement('script');
+            s.id = 'gtagScript'; s.async = true;
+            s.src = 'https://www.googletagmanager.com/gtag/js?id=G-WATTEST0000';
+            document.head.appendChild(s);
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function () { window.dataLayer.push(arguments); };
+            window.gtag('js', new Date());
+            window.gtag('config', 'G-WATTEST0000');
+            log('Third-party script loaded: googletagmanager.com/gtag/js', 'warn');
+          }
+        }
+        log('Analytics trackers set (_ga, _gid, analytics_client_id)');
+      },
+      unset() {
+        ['_ga', '_gid', '_ga_WATTEST0000', '_gat'].forEach(deleteCookie);
+        localStorage.removeItem('analytics_client_id');
+        const s = document.getElementById('gtagScript'); if (s) s.remove();
+        window.dataLayer = []; delete window.gtag;
+        log('Analytics trackers removed');
+      }
+    },
+    marketing: {
+      set() {
+        setCookie('_fbp', `fb.1.${Date.now()}.${Math.floor(Math.random() * 1e10)}`, 90);
+        setCookie('ads_uid', rand(24), 365);
+        sessionStorage.setItem('ad_session', rand(12));
+        idbWrite('marketing_db', 'profile', { id: rand(10), segments: ['tech', 'privacy'], ts: Date.now() });
+        if (opts().realThirdParty !== false) {
+          const img = new Image(1, 1);
+          img.src = 'https://www.facebook.com/tr?id=000000000000000&ev=PageView&noscript=1&_=' + Date.now();
+          img.alt = ''; img.style.display = 'none'; img.id = 'fbPixel';
+          document.body.appendChild(img);
+          log('Third-party pixel loaded: facebook.com/tr', 'warn');
+        }
+        log('Advertising trackers set (_fbp, ads_uid, ad_session, IndexedDB marketing_db)');
+      },
+      unset() {
+        ['_fbp', 'ads_uid', 'fr'].forEach(deleteCookie);
+        sessionStorage.removeItem('ad_session');
+        idbDelete('marketing_db');
+        const p = document.getElementById('fbPixel'); if (p) p.remove();
+        log('Advertising trackers removed');
+      }
+    },
+    personalization: {
+      set() {
+        setCookie('theme_pref', 'dark', 365);
+        setCookie('lang_pref', 'en', 365);
+        localStorage.setItem('personalization_profile', JSON.stringify({ theme: 'dark', lang: 'en', font: 'large' }));
+        log('Personalisation trackers set (theme_pref, lang_pref, personalization_profile)');
+      },
+      unset() {
+        ['theme_pref', 'lang_pref'].forEach(deleteCookie);
+        localStorage.removeItem('personalization_profile');
+        log('Personalisation trackers removed');
+      }
+    }
+  };
+
+  function applyConsent(consent) {
+    CATEGORIES.forEach(cat => {
+      const allowed = !!(consent && consent[cat]);
+      if (allowed || NON_COMPLIANT) trackers[cat].set();
+      else trackers[cat].unset();
+    });
+    if (NON_COMPLIANT && consent && !CATEGORIES.some(c => consent[c])) {
+      log('NON-COMPLIANT MODE: rejection/withdrawal ignored, trackers kept', 'bad');
+    }
+  }
+
+  // ---------- IndexedDB ----------
+  let idbNames = [];
+  function idbWrite(db, store, value) {
+    const req = indexedDB.open(db, 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore(store, { keyPath: 'id' });
+    req.onsuccess = e => {
+      const d = e.target.result;
+      d.transaction(store, 'readwrite').objectStore(store).put(value);
+      d.close();
+      if (!idbNames.includes(db)) idbNames.push(db);
+      render();
+    };
+  }
+  function idbDelete(db) {
+    const req = indexedDB.deleteDatabase(db);
+    req.onsuccess = req.onerror = req.onblocked = () => { idbNames = idbNames.filter(n => n !== db); render(); };
+  }
+  async function idbList() {
+    if (indexedDB.databases) {
+      try { return (await indexedDB.databases()).map(d => d.name).filter(Boolean); } catch (e) { /* ignore */ }
+    }
+    return idbNames;
+  }
+
+  // ---------- Public actions ----------
+  function choices(analytics, marketing, personalization) { return { analytics, marketing, personalization }; }
+  window.acceptAll = function () {
+    const c = writeConsent(choices(true, true, true), 'accept_all');
+    log('Consent: ALL ACCEPTED', 'ok');
+    applyConsent(c); afterChoice();
+  };
+  window.rejectAll = function () {
+    const c = writeConsent(choices(false, false, false), 'reject_all');
+    log('Consent: ALL REJECTED', 'ok');
+    applyConsent(c); afterChoice();
+  };
+  window.savePrefs = function () {
+    const c = writeConsent(choices(
+      document.getElementById('c_analytics').checked,
+      document.getElementById('c_marketing').checked,
+      document.getElementById('c_personalization').checked), 'custom');
+    const on = CATEGORIES.filter(k => c[k]);
+    log('Custom consent saved: ' + (on.length ? on.join(', ') : 'no category'), 'ok');
+    applyConsent(c); afterChoice();
+  };
+  window.withdraw = function () {
+    const c = writeConsent(choices(false, false, false), 'withdraw');
+    log('Consent WITHDRAWN by the user', 'ok');
+    applyConsent(c); afterChoice();
+  };
+  window.openPrefs = function () {
+    const c = readConsent() || {};
+    CATEGORIES.forEach(k => { document.getElementById('c_' + k).checked = !!c[k]; });
+    document.getElementById('prefs').style.display = 'flex';
+  };
+  window.closePrefs = function () { document.getElementById('prefs').style.display = 'none'; };
+  window.resetAll = function () {
+    CATEGORIES.forEach(k => trackers[k].unset());
+    getCookies().forEach(([k]) => deleteCookie(k));
+    localStorage.clear(); sessionStorage.clear();
+    idbDelete('marketing_db');
+    setTimeout(() => location.replace(location.pathname + location.search), 300);
+  };
+  function afterChoice() {
+    closePrefs();
+    document.getElementById('banner').classList.add('hidden');
+    document.getElementById('manage').classList.remove('hidden');
+    render();
+  }
+
+  // ---------- Rendering ----------
+  function fillTable(id, rows) {
+    const tb = document.getElementById(id);
+    tb.innerHTML = '';
+    if (!rows.length) { tb.innerHTML = '<tr><td class="empty" colspan="2">none</td></tr>'; return; }
+    rows.forEach(([k, v]) => {
+      const tr = document.createElement('tr');
+      const td1 = document.createElement('td'); td1.innerHTML = '<code></code>'; td1.firstChild.textContent = k;
+      const td2 = document.createElement('td'); td2.textContent = String(v).length > 80 ? String(v).slice(0, 80) + '…' : v;
+      tr.append(td1, td2); tb.appendChild(tr);
+    });
+  }
+  window.render = async function () {
+    fillTable('cookiesTbl', getCookies());
+    fillTable('lsTbl', Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]));
+    fillTable('ssTbl', Object.keys(sessionStorage).map(k => [k, sessionStorage.getItem(k)]));
+    fillTable('idbTbl', (await idbList()).map(n => [n, 'database']));
+
+    const c = readConsent();
+    const badge = document.getElementById('consentBadge');
+    const sum = document.getElementById('consentSummary');
+    if (!c) { badge.textContent = 'no choice yet'; badge.className = 'badge warn'; sum.textContent = 'No choice recorded: only essential trackers should be present.'; }
+    else {
+      const on = CATEGORIES.filter(k => c[k]);
+      const labels = { accept_all: 'all accepted', reject_all: 'all rejected', custom: 'custom', withdraw: 'withdrawn' };
+      badge.textContent = labels[c.action] || c.action;
+      badge.className = 'badge ' + (c.action === 'reject_all' || c.action === 'withdraw' ? 'bad' : on.length ? 'ok' : 'warn');
+      sum.textContent = `Choice "${labels[c.action] || c.action}" on ${new Date(c.ts).toLocaleString()} — active categories: ${on.length ? on.join(', ') : 'none'}.`;
+    }
+  };
+
+  // ---------- Initialisation ----------
+  document.getElementById('modeBadge').textContent = NON_COMPLIANT ? 'NON-COMPLIANT' : 'compliant';
+  document.getElementById('modeBadge').className = 'badge ' + (NON_COMPLIANT ? 'bad' : 'ok');
+  document.getElementById('modeHelp').textContent = NON_COMPLIANT
+    ? '— trackers set before consent, rejection and withdrawal have no effect'
+    : '— no non-essential tracker before you choose';
+  document.getElementById('realThirdParty').checked = opts().realThirdParty !== false;
+
+  if (!getCookies().some(([k]) => k === 'session_id')) setCookie('session_id', rand(32), 0);
+
+  const existing = readConsent();
+  if (existing) {
+    log('Existing consent found (' + existing.action + '), applying choices');
+    applyConsent(existing);
+    document.getElementById('manage').classList.remove('hidden');
+  } else {
+    log('No consent: showing the banner');
+    document.getElementById('banner').classList.remove('hidden');
+    if (NON_COMPLIANT) {
+      log('NON-COMPLIANT MODE: setting trackers BEFORE any choice', 'bad');
+      applyConsent(null);
+    }
+  }
+  render();
+})();
+</script>
+</body>
+</html>
